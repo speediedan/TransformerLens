@@ -1811,9 +1811,10 @@ class TransformerBridge(nn.Module):
 
         # Return ModelOutput if output_logits was requested
         if output_logits and logits_seq_list is not None:
+            from transformers.utils import ModelOutput  # type: ignore
+
             try:
                 from transformers.generation.utils import GenerateDecoderOnlyOutput
-                from transformers.utils import ModelOutput  # type: ignore
 
                 # Return a HF-compatible ModelOutput structure
                 # GenerateDecoderOnlyOutput expects: sequences, scores (optional), logits (optional)
@@ -1823,10 +1824,8 @@ class TransformerBridge(nn.Module):
                     # (variable-length tuple with one element per generated token)
                     logits=tuple(logits_seq_list),  # type: ignore[arg-type]
                 )
-            except ImportError:
-                # Fallback if HF not available or old version
-                from transformers.utils import ModelOutput
-
+            except (ImportError, AttributeError):
+                # Fallback if GenerateDecoderOnlyOutput not available in this transformers version
                 return ModelOutput(
                     sequences=output_tokens,
                     logits=tuple(logits_seq_list),
@@ -1962,7 +1961,7 @@ class TransformerBridge(nn.Module):
         # If any HF-style output flags are provided, ensure return_dict_in_generate is set
         any_flag_set = False
         for f in hf_dict_flags:
-            if f in generation_kwargs and generation_kwargs.get(f) is not None:
+            if generation_kwargs.get(f) is not None:
                 generation_kwargs[f] = bool(generation_kwargs[f])
                 any_flag_set = True
 
@@ -2023,6 +2022,7 @@ class TransformerBridge(nn.Module):
         Args:
             args: Positional arguments for nn.Module.to
             kwargs: Keyword arguments for nn.Module.to
+            print_details: Whether to print details about device/dtype changes (default: True)
 
         Returns:
             Self for chaining
